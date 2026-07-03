@@ -1,0 +1,20 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//DMS Group//The Gala//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:thegala-2026@dmsgroup.me
+DTSTAMP:20260703T120000Z
+DTSTART:20260730T150000Z
+DTEND:20260730T210000Z
+SUMMARY:THE GALA - powered by DMS Group
+DESCRIPTION:An exclusive black-tie red carpet evening. Complimentary VIP valet at the entrance. Location map: https://maps.app.goo.gl/S1gajAVATakvTFJw9
+LOCATION:Amman Golf Club\, Amman\, Jordan
+BEGIN:VALARM
+TRIGGER:-PT3H
+ACTION:DISPLAY
+DESCRIPTION:THE GALA this evening - black tie
+END:VALARM
+END:VEVENT
+END:VCALENDAR
