@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>The Gala &#183; Command Center</title>
+<style>
+  :root {
+    --ink: #0d1321; --navy: #212f52; --cream: #f6f6f9; --dim: #9aa2b8; --gold: #d1b589;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--ink); color: var(--cream);
+    font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
+    min-height: 100dvh; display: flex; flex-direction: column; align-items: center;
+    padding: 24px 16px 40px;
+  }
+  h1 { font-size: 0.8rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold); margin: 8px 0 4px; text-align: center; }
+  .sub { font-size: 0.7rem; color: var(--dim); letter-spacing: 0.12em; margin-bottom: 22px; text-align: center; }
+  .panel { width: 100%; max-width: 460px; text-align: center; }
+  input {
+    width: 100%; padding: 15px; font-size: 1.1rem; text-align: center;
+    background: #141b2e; color: var(--cream);
+    border: 1px solid rgba(209,181,137,0.4); outline: none; letter-spacing: 0.2em;
+  }
+  button {
+    width: 100%; padding: 15px; margin-top: 12px; font-size: 0.85rem;
+    letter-spacing: 0.2em; text-transform: uppercase; font-weight: 600;
+    background: var(--gold); color: #101728; border: none; cursor: pointer;
+  }
+  .hint { font-size: 0.72rem; color: var(--dim); margin-top: 14px; line-height: 1.6; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; }
+  .tile {
+    background: #141b2e; border: 1px solid rgba(209,181,137,0.25); padding: 14px 16px;
+  }
+  .tile.hero { grid-column: 1 / -1; border-color: rgba(209,181,137,0.6); }
+  .tile .label { font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
+  .tile .value { font-size: 1.9rem; font-weight: 700; color: var(--gold); margin-top: 4px; }
+  .tile.hero .value { font-size: 2.6rem; }
+  .section { font-size: 0.68rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold); margin: 26px 0 10px; text-align: left; }
+  .arrival {
+    display: flex; justify-content: space-between; align-items: baseline;
+    background: #141b2e; border: 1px solid rgba(209,181,137,0.25);
+    padding: 11px 16px; margin-top: 6px; text-align: left;
+  }
+  .arrival .aName { font-size: 0.95rem; font-weight: 600; }
+  .arrival .aTime { font-size: 0.75rem; color: var(--dim); letter-spacing: 0.1em; }
+  #status { font-size: 0.68rem; color: var(--dim); margin-top: 20px; letter-spacing: 0.15em; }
+  #board { display: none; }
+  .err { color: #c98080; }
+</style>
+</head>
+<body>
+  <h1>The Gala &#183; Command Center</h1>
+  <p class="sub">THURSDAY, JULY 30, 2026 &#183; 6:00 PM &#183; AMMAN GOLF CLUB</p>
+
+  <div class="panel" id="gate">
+    <input id="key" type="tel" placeholder="HOST KEY" autocomplete="off">
+    <button onclick="unlock()">Enter</button>
+    <p class="hint">Private page for the event host.</p>
+  </div>
+
+  <div class="panel" id="board">
+    <div class="grid">
+      <div class="tile hero"><p class="label">Expected Tonight</p><p class="value" id="vExpected">&#8211;</p></div>
+      <div class="tile"><p class="label">Arrived</p><p class="value" id="vArrived">&#8211;</p></div>
+      <div class="tile"><p class="label">Attending</p><p class="value" id="vAttending">&#8211;</p></div>
+      <div class="tile"><p class="label">Confirmed 100%</p><p class="value" id="vConfirmed">&#8211;</p></div>
+      <div class="tile"><p class="label">Apologized</p><p class="value" id="vApologized">&#8211;</p></div>
+      <div class="tile"><p class="label">Awaiting Reply</p><p class="value" id="vPending">&#8211;</p></div>
+      <div class="tile"><p class="label">Opened Their Link</p><p class="value" id="vOpened">&#8211;</p></div>
+    </div>
+    <p class="section">Latest Arrivals</p>
+    <div id="arrivals"><p class="hint">No arrivals recorded yet.</p></div>
+    <button onclick="refresh()">Refresh Now</button>
+    <p id="status"></p>
+  </div>
+
+<script>
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvRiiDfD7WHzaOd3rcePD8_myZ3pCIS2-_SzkLl2yC2YUcGUqOUjN6kR0CWqY1CVpywQ/exec';
+  var hostKey = '';
+  var timer = null;
+
+  try { hostKey = localStorage.getItem('gala_host_key') || ''; } catch (e) {}
+  if (hostKey) { openBoard(); }
+
+  function unlock() {
+    hostKey = document.getElementById('key').value.trim();
+    if (!hostKey) return;
+    try { localStorage.setItem('gala_host_key', hostKey); } catch (e) {}
+    openBoard();
+  }
+
+  function openBoard() {
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('board').style.display = 'block';
+    refresh();
+    if (timer) clearInterval(timer);
+    timer = setInterval(refresh, 30000);
+  }
+
+  function refresh() {
+    setStatus('Updating...', false);
+    fetch(SCRIPT_URL + '?stats=1&key=' + encodeURIComponent(hostKey))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.error === 'unauthorized') {
+          try { localStorage.removeItem('gala_host_key'); } catch (e) {}
+          if (timer) clearInterval(timer);
+          document.getElementById('board').style.display = 'none';
+          document.getElementById('gate').style.display = 'block';
+          return;
+        }
+        if (!d || !d.ok || !d.counts) { setStatus('Could not update. Will retry.', true); return; }
+        var c = d.counts;
+        put('vExpected', c.expected);
+        put('vArrived', c.arrived);
+        put('vAttending', c.attending);
+        put('vConfirmed', c.confirmed);
+        put('vApologized', c.apologized);
+        put('vPending', c.invited + c.followedUp);
+        put('vOpened', c.opened);
+        var box = document.getElementById('arrivals');
+        box.innerHTML = '';
+        if (d.recent && d.recent.length) {
+          for (var i = 0; i < d.recent.length; i++) {
+            var row = document.createElement('div');
+            row.className = 'arrival';
+            var nm = document.createElement('span');
+            nm.className = 'aName';
+            nm.textContent = d.recent[i].name;
+            var tm = document.createElement('span');
+            tm.className = 'aTime';
+            tm.textContent = d.recent[i].at;
+            row.appendChild(nm); row.appendChild(tm);
+            box.appendChild(row);
+          }
+        } else {
+          box.innerHTML = '<p class="hint">No arrivals recorded yet.</p>';
+        }
+        var now = new Date();
+        setStatus('UPDATED ' + two(now.getHours()) + ':' + two(now.getMinutes()) + ':' + two(now.getSeconds()) + ' \u00B7 AUTO-REFRESH 30S', false);
+      })
+      .catch(function () {
+        setStatus('Connection issue. Will retry.', true);
+      });
+  }
+
+  function put(id, v) {
+    document.getElementById(id).textContent = (typeof v === 'number') ? String(v) : '-';
+  }
+
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+
+  function setStatus(msg, isErr) {
+    var s = document.getElementById('status');
+    s.textContent = msg;
+    s.className = isErr ? 'err' : '';
+  }
+</script>
+</body>
+</html>
