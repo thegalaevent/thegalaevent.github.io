@@ -45,6 +45,15 @@
   .row input { flex: 1; letter-spacing: 0.1em; }
   .row button { width: auto; margin: 0; padding: 0 18px; }
   #count { font-size: 0.75rem; color: var(--dim); margin-top: 16px; letter-spacing: 0.15em; }
+  #matches { margin-top: 10px; text-align: left; }
+  .match {
+    width: 100%; padding: 12px 14px; margin-top: 6px; cursor: pointer;
+    background: #141b2e; border: 1px solid rgba(209,181,137,0.4);
+  }
+  .match .mName { font-size: 1rem; font-weight: 600; color: var(--cream); }
+  .match .mSub { font-size: 0.72rem; color: var(--dim); margin-top: 3px; letter-spacing: 0.05em; }
+  .match.in { border-color: rgba(143,48,48,0.8); }
+  .match.in .mSub { color: #c98080; }
 </style>
 </head>
 <body>
@@ -63,6 +72,11 @@
       <input id="manual" placeholder="or type guest code" autocomplete="off">
       <button onclick="manualCheck()">Check</button>
     </div>
+    <div class="row">
+      <input id="search" placeholder="or search guest name" autocomplete="off">
+      <button onclick="lookupName()">Find</button>
+    </div>
+    <div id="matches"></div>
     <button class="ghost" onclick="resume()" id="resumeBtn" style="display:none">Scan Next Guest</button>
     <p class="hint">Point the camera at the guest's QR code. Green = admit. Red = already admitted or invalid.</p>
     <p id="count"></p>
@@ -145,9 +159,9 @@
       .then(function (d) {
         if (d && d.ok) {
           admitted++;
-          showResult('good', 'WELCOME', d.name, 'Admitted at ' + d.at);
+          showResult('good', d.vip ? 'WELCOME \u00B7 VIP' : 'WELCOME', d.name, 'Admitted at ' + d.at + (d.table ? ' \u00B7 Table ' + d.table : ''));
         } else if (d && d.dup) {
-          showResult('bad', 'ALREADY ADMITTED', d.name, 'First entry: ' + d.at);
+          showResult('bad', 'ALREADY ADMITTED', d.name, 'First entry: ' + d.at + (d.table ? ' \u00B7 Table ' + d.table : ''));
         } else if (d && d.error === 'unauthorized') {
           try { localStorage.removeItem('gala_door_key'); } catch (e) {}
           showResult('bad', 'WRONG PASSCODE', '', 'Reload the page and enter the correct passcode.');
@@ -175,6 +189,56 @@
     document.getElementById('result').className = '';
     document.getElementById('resumeBtn').style.display = 'none';
     document.getElementById('manual').value = '';
+    document.getElementById('search').value = '';
+    document.getElementById('matches').innerHTML = '';
+  }
+
+  function lookupName() {
+    var q = document.getElementById('search').value.trim();
+    var box = document.getElementById('matches');
+    if (q.length < 2) { box.innerHTML = ''; return; }
+    box.innerHTML = '<p class="hint">Searching...</p>';
+    fetch(SCRIPT_URL + '?lookup=1&q=' + encodeURIComponent(q) + '&key=' + encodeURIComponent(doorKey))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        box.innerHTML = '';
+        if (d && d.error === 'unauthorized') {
+          try { localStorage.removeItem('gala_door_key'); } catch (e) {}
+          showResult('bad', 'WRONG PASSCODE', '', 'Reload the page and enter the correct passcode.');
+          return;
+        }
+        if (!d || !d.ok || !d.matches || !d.matches.length) {
+          box.innerHTML = '<p class="hint">No guest matches that name.</p>';
+          return;
+        }
+        for (var i = 0; i < d.matches.length; i++) {
+          box.appendChild(buildMatch(d.matches[i]));
+        }
+      })
+      .catch(function () {
+        box.innerHTML = '<p class="hint">Connection issue. Try again.</p>';
+      });
+  }
+
+  function buildMatch(m) {
+    var el = document.createElement('div');
+    el.className = m.arrived ? 'match in' : 'match';
+    var nm = document.createElement('p');
+    nm.className = 'mName';
+    nm.textContent = m.name;
+    var sub = document.createElement('p');
+    sub.className = 'mSub';
+    var bits = [m.status || 'No status'];
+    if (m.table) bits.push('Table ' + m.table);
+    bits.push(m.arrived ? 'ALREADY IN (' + m.arrived + ')' : 'Tap to admit');
+    sub.textContent = bits.join(' \u00B7 ');
+    el.appendChild(nm); el.appendChild(sub);
+    el.onclick = function () {
+      document.getElementById('matches').innerHTML = '';
+      document.getElementById('search').value = '';
+      checkin(m.code);
+    };
+    return el;
   }
 
   function updateCount() {
