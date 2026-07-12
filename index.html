@@ -406,6 +406,8 @@
         <p class="hub-label">Your Invitation Card</p>
         <p class="hub-note">A physical invitation card will soon be delivered to your hand. Kindly share your delivery details within Jordan.</p>
         <div id="cardFields">
+          <input class="fld" id="cardInvName" placeholder="Your name as it shall appear on the invitation">
+          <input class="fld" id="cardIg" placeholder="Instagram handle - optional">
           <input class="fld" id="cardCity" placeholder="City">
           <input class="fld" id="cardArea" placeholder="Area">
           <input class="fld" id="cardStreet" placeholder="Street">
@@ -517,7 +519,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (d.photos) { el('photosBtn').href = d.photos; el('photosWrap').style.display = 'block'; }
     if (d.jo) {
       el('cardWrap').style.display = 'block';
-      if (d.card) { cardShowSaved(d.card); }
+      if (d.invname) { el('cardInvName').value = d.invname; }
+      else if (!el('cardInvName').value) { el('cardInvName').value = fullName; }
+      if (d.ig) { el('cardIg').value = d.ig; }
+      if (d.card) { cardShowSaved(d.card, d.invname || ''); }
     }
     if (d.ch && d.ch.on) { chaufShowSaved(d.ch.loc, d.ch.ph); }
     if (d.pax > 1 && d.seats && d.seats.length) { buildSeats(d); }
@@ -627,10 +632,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
 
   function cardMsgSet(t, bad) { var m = el('cardMsg'); m.textContent = t; m.className = bad ? 'tiny-msg bad' : 'tiny-msg'; }
-  function cardShowSaved(addr) {
+  function cardShowSaved(addr, invName) {
     el('cardFields').style.display = 'none';
     el('cardSaveWrap').style.display = 'none';
-    el('cardSaved').textContent = 'Your invitation card will be delivered to: ' + addr.replace(/ \| /g, ' \u00B7 ');
+    el('cardSaved').textContent = 'Your invitation card' + (invName ? ' for ' + invName : '') + ' will be delivered to: ' + addr.replace(/ \| /g, ' \u00B7 ');
     el('cardSaved').style.display = 'block';
     el('cardEditWrap').style.display = 'flex';
     try {
@@ -653,21 +658,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     el('cardSaveWrap').style.display = 'flex';
   }
   function saveCard() {
+    var invName = el('cardInvName').value.trim();
+    var ig = el('cardIg').value.trim();
     var city = el('cardCity').value.trim();
     var area = el('cardArea').value.trim();
     var street = el('cardStreet').value.trim();
     var bldg = el('cardBldg').value.trim();
     var dphone = el('cardPhone').value.trim();
+    if (invName.length < 2) { cardMsgSet('Kindly enter the name to appear on your invitation.', true); return; }
     if (!city || !area || !street || !bldg) { cardMsgSet('Kindly complete every field of the delivery details.', true); return; }
     if (dphone.replace(/\D/g, '').length < 8) { cardMsgSet('Kindly enter a valid phone number for delivery.', true); return; }
     var addr = 'City: ' + city + ' | Area: ' + area + ' | Street: ' + street + ' | Villa/Bldg: ' + bldg + ' | Phone: ' + dphone;
     el('cardSave').disabled = true;
     cardMsgSet('Saving...', false);
-    fetch(SCRIPT_URL + '?card=1&token=' + encodeURIComponent(token) + '&address=' + encodeURIComponent(addr))
+    fetch(SCRIPT_URL + '?card=1&token=' + encodeURIComponent(token) + '&address=' + encodeURIComponent(addr) + '&invname=' + encodeURIComponent(invName) + '&ig=' + encodeURIComponent(ig))
       .then(function (r) { return r.json(); })
       .then(function (d) {
         el('cardSave').disabled = false;
-        if (d && d.ok) { cardMsgSet('', false); cardShowSaved(addr); }
+        if (d && d.ok) { cardMsgSet('', false); cardShowSaved(addr, invName); }
         else { cardMsgSet('Something interrupted the connection. Please try once more.', true); }
       })
       .catch(function () {
@@ -694,12 +702,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     show('accepted'); startCountdown(); renderCard(); loadExtras();
   } else if (remembered === 'no') {
     show('declined');
-  } else if (firstName) {
-    document.getElementById('greeting').textContent = 'Dear ' + firstName + ',';
+  } else if (fullName) {
+    document.getElementById('greeting').textContent = 'Dear ' + fullName + ',';
   }
 
-  document.getElementById('nameYes').textContent = firstName || 'dear guest';
-  document.getElementById('nameNo').textContent = firstName || 'dear guest';
+  document.getElementById('nameYes').textContent = fullName || 'dear guest';
+  document.getElementById('nameNo').textContent = fullName || 'dear guest';
 
   var busy = false;
   function respond(answer, phone) {
