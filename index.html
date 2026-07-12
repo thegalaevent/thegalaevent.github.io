@@ -234,6 +234,28 @@
     transition: border-color 0.25s, color 0.25s;
   }
   .hub-btn:hover { border-color: var(--gold); color: var(--gold); }
+  button.hub-btn { background: transparent; cursor: pointer; }
+  button.hub-btn:disabled { opacity: 0.5; cursor: default; }
+  .hub-btn.solid { background: var(--gold); color: #101728; border-color: var(--gold); }
+  .hub-btn.solid:hover { color: #101728; }
+  .hub-btn.pick.active { border-color: var(--gold); color: var(--gold); }
+  .fld {
+    display: block; width: 100%; max-width: 340px; margin: 10px auto 0;
+    padding: 13px 14px; font-family: 'Jost', sans-serif; font-size: 0.9rem;
+    color: var(--cream); background: rgba(13,19,33,0.55);
+    border: 1px solid rgba(209,181,137,0.45); outline: none; text-align: center;
+  }
+  .fld:focus { border-color: var(--gold); }
+  .fld::placeholder { color: var(--cream-dim); }
+  .tiny-msg { font-size: 0.72rem; letter-spacing: 0.08em; color: var(--cream-dim); margin-top: 10px; min-height: 1em; }
+  .tiny-msg.bad { color: #c98080; }
+  .seat-row { max-width: 340px; margin: 8px auto 0; }
+  .seat-fixed {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    padding: 12px 14px; border: 1px solid rgba(209,181,137,0.3);
+    font-size: 0.95rem; color: var(--cream); text-align: left;
+  }
+  .seat-fixed a { color: var(--gold); font-size: 0.68rem; letter-spacing: 0.15em; text-transform: uppercase; text-decoration: none; white-space: nowrap; }
 
   .ecard {
     max-width: 320px;
@@ -352,8 +374,37 @@
         <a class="hub-btn" href="gala.ics">Apple Calendar</a>
         <a class="hub-btn" href="https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=THE+GALA+-+powered+by+DMS+Group&amp;dates=20260730T150000Z/20260730T210000Z&amp;location=Amman+Golf+Club%2C+Amman%2C+Jordan&amp;details=An+exclusive+black-tie+red+carpet+evening.+Complimentary+VIP+valet+at+the+entrance.+Location+map%3A+https%3A%2F%2Fmaps.app.goo.gl%2FS1gajAVATakvTFJw9" target="_blank" rel="noopener">Google Calendar</a>
       </div>
+      <div id="groupWrap" style="display:none">
+        <p class="hub-label">Your Party</p>
+        <p class="hub-note" id="groupNote"></p>
+        <div id="seatList"></div>
+        <div class="hub-actions"><button class="hub-btn solid" id="seatSave" type="button">Confirm Attendees</button></div>
+        <p class="tiny-msg" id="seatMsg"></p>
+      </div>
       <p class="hub-label">Arrival</p>
-      <p class="hub-note">Complimentary VIP valet service awaits you at the entrance. Should you prefer to be driven, our chauffeured VIP cars are at your service, from your door, home or hotel, wherever you may be, to the red carpet and home again. Kindly arrange it with your host over WhatsApp.</p>
+      <p class="hub-note">Complimentary VIP valet service awaits you at the entrance. Should you prefer to be driven, our chauffeured VIP cars are at your service, from your door, home or hotel, wherever you may be, to the red carpet and home again.</p>
+      <div class="hub-actions" id="chaufAsk"><button class="hub-btn" id="chaufToggle" type="button">Request Private Chauffeur</button></div>
+      <div id="chaufForm" style="display:none">
+        <div class="hub-actions">
+          <button class="hub-btn pick active" id="pickHome" type="button">From Home</button>
+          <button class="hub-btn pick" id="pickHotel" type="button">From Hotel</button>
+        </div>
+        <input class="fld" id="chaufLoc" placeholder="Your home address">
+        <input class="fld" id="chaufPhone" placeholder="Contact number - with country code" inputmode="tel">
+        <div class="hub-actions"><button class="hub-btn solid" id="chaufSave" type="button">Confirm Pickup</button></div>
+      </div>
+      <p class="hub-note" id="chaufSaved" style="display:none"></p>
+      <div class="hub-actions" id="chaufEditWrap" style="display:none"><button class="hub-btn" id="chaufEdit" type="button">Amend Details</button></div>
+      <p class="tiny-msg" id="chaufMsg"></p>
+      <div id="cardWrap" style="display:none">
+        <p class="hub-label">Your Invitation Card</p>
+        <p class="hub-note">A physical invitation card will soon be delivered to your hand. Kindly share your delivery address within Jordan.</p>
+        <input class="fld" id="cardAddr" placeholder="Delivery address - area, street, building">
+        <div class="hub-actions" id="cardSaveWrap"><button class="hub-btn solid" id="cardSave" type="button">Confirm Address</button></div>
+        <p class="hub-note" id="cardSaved" style="display:none"></p>
+        <div class="hub-actions" id="cardEditWrap" style="display:none"><button class="hub-btn" id="cardEdit" type="button">Amend Address</button></div>
+        <p class="tiny-msg" id="cardMsg"></p>
+      </div>
       <div id="photosWrap" style="display:none">
         <p class="hub-label">Your Photographs</p>
         <div class="hub-actions"><a class="hub-btn" id="photosBtn" href="#" target="_blank" rel="noopener">View Your Gallery</a></div>
@@ -444,14 +495,165 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (DEMO) return;
     fetch(SCRIPT_URL + '?info=1&token=' + encodeURIComponent(token))
       .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d && d.photos) {
-          document.getElementById('photosBtn').href = d.photos;
-          document.getElementById('photosWrap').style.display = 'block';
-        }
-      })
+      .then(function (d) { if (d && d.ok) applyExtras(d); })
       .catch(function () {});
   }
+
+  function el(id) { return document.getElementById(id); }
+
+  function applyExtras(d) {
+    if (d.photos) { el('photosBtn').href = d.photos; el('photosWrap').style.display = 'block'; }
+    if (d.jo) {
+      el('cardWrap').style.display = 'block';
+      if (d.card) { cardShowSaved(d.card); }
+    }
+    if (d.ch && d.ch.on) { chaufShowSaved(d.ch.loc, d.ch.ph); }
+    if (d.pax > 1 && d.seats && d.seats.length) { buildSeats(d); }
+  }
+
+  function buildSeats(d) {
+    el('groupNote').textContent = 'Your reservation admits ' + d.pax + ' guests. Kindly share the names of those attending with you; each will receive their own entrance card.';
+    var list = el('seatList');
+    list.innerHTML = '';
+    var pending = 0;
+    for (var i = 0; i < d.seats.length; i++) {
+      var s = d.seats[i];
+      var wrap = document.createElement('div');
+      wrap.className = 'seat-row';
+      if (s.n) {
+        var f = document.createElement('div');
+        f.className = 'seat-fixed';
+        var nm = document.createElement('span');
+        nm.textContent = s.n;
+        var a = document.createElement('a');
+        a.textContent = 'Their Card';
+        a.target = '_blank'; a.rel = 'noopener';
+        a.href = location.origin + location.pathname + '?g=' + s.t + '~' + encodeURIComponent(s.n);
+        f.appendChild(nm); f.appendChild(a);
+        wrap.appendChild(f);
+      } else {
+        pending++;
+        var inp = document.createElement('input');
+        inp.className = 'fld';
+        inp.placeholder = 'Guest ' + (i + 2) + ' - full name';
+        inp.setAttribute('data-seat', s.t);
+        wrap.appendChild(inp);
+      }
+      list.appendChild(wrap);
+    }
+    el('seatSave').style.display = pending ? 'inline-block' : 'none';
+    el('groupWrap').style.display = 'block';
+  }
+
+  function seatMsg(t, bad) { var m = el('seatMsg'); m.textContent = t; m.className = bad ? 'tiny-msg bad' : 'tiny-msg'; }
+
+  function saveSeats() {
+    var inputs = Array.prototype.slice.call(document.querySelectorAll('#seatList input[data-seat]'));
+    var todo = inputs.filter(function (x) { return x.value.trim().length > 1; });
+    if (!todo.length) { seatMsg('Kindly enter at least one name.', true); return; }
+    el('seatSave').disabled = true;
+    seatMsg('Registering your party...', false);
+    var idx = 0, okCount = 0;
+    function next() {
+      if (idx >= todo.length) {
+        el('seatSave').disabled = false;
+        seatMsg(okCount === todo.length ? 'Your party has been registered.' : 'Some names could not be saved. Please try once more.', okCount !== todo.length);
+        fetch(SCRIPT_URL + '?info=1&token=' + encodeURIComponent(token))
+          .then(function (r) { return r.json(); })
+          .then(function (d) { if (d && d.ok) applyExtras(d); })
+          .catch(function () {});
+        return;
+      }
+      var box = todo[idx]; idx++;
+      fetch(SCRIPT_URL + '?setname=1&token=' + encodeURIComponent(token) + '&seat=' + encodeURIComponent(box.getAttribute('data-seat')) + '&name=' + encodeURIComponent(box.value.trim()))
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d && d.ok) okCount++; next(); })
+        .catch(function () { next(); });
+    }
+    next();
+  }
+
+  var chaufType = 'Home';
+  function chaufMsg(t, bad) { var m = el('chaufMsg'); m.textContent = t; m.className = bad ? 'tiny-msg bad' : 'tiny-msg'; }
+  function chaufPick(t) {
+    chaufType = t;
+    el('pickHome').className = 'hub-btn pick' + (t === 'Home' ? ' active' : '');
+    el('pickHotel').className = 'hub-btn pick' + (t === 'Hotel' ? ' active' : '');
+    el('chaufLoc').placeholder = t === 'Home' ? 'Your home address' : 'Hotel name';
+  }
+  function chaufShowSaved(loc, ph) {
+    el('chaufAsk').style.display = 'none';
+    el('chaufForm').style.display = 'none';
+    el('chaufSaved').textContent = 'Your chauffeur is arranged - ' + loc + '. Our team will confirm the timing with you on ' + ph + '.';
+    el('chaufSaved').style.display = 'block';
+    el('chaufEditWrap').style.display = 'flex';
+  }
+  function chaufOpenForm() {
+    el('chaufAsk').style.display = 'none';
+    el('chaufSaved').style.display = 'none';
+    el('chaufEditWrap').style.display = 'none';
+    el('chaufForm').style.display = 'block';
+    chaufPick(chaufType);
+  }
+  function saveChauf() {
+    var loc = el('chaufLoc').value.trim();
+    var ph = el('chaufPhone').value.trim();
+    if (!loc || !ph) { chaufMsg('Kindly complete the location and contact number.', true); return; }
+    el('chaufSave').disabled = true;
+    chaufMsg('Arranging...', false);
+    fetch(SCRIPT_URL + '?chauffeur=1&token=' + encodeURIComponent(token) + '&type=' + encodeURIComponent(chaufType) + '&loc=' + encodeURIComponent(loc) + '&phone=' + encodeURIComponent(ph))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        el('chaufSave').disabled = false;
+        if (d && d.ok) { chaufMsg('', false); chaufShowSaved(chaufType + ': ' + loc, ph); }
+        else { chaufMsg('Something interrupted the connection. Please try once more.', true); }
+      })
+      .catch(function () {
+        el('chaufSave').disabled = false;
+        chaufMsg('Something interrupted the connection. Please try once more.', true);
+      });
+  }
+
+  function cardMsgSet(t, bad) { var m = el('cardMsg'); m.textContent = t; m.className = bad ? 'tiny-msg bad' : 'tiny-msg'; }
+  function cardShowSaved(addr) {
+    el('cardAddr').style.display = 'none';
+    el('cardSaveWrap').style.display = 'none';
+    el('cardSaved').textContent = 'Your invitation card will be delivered to: ' + addr;
+    el('cardSaved').style.display = 'block';
+    el('cardEditWrap').style.display = 'flex';
+  }
+  function cardOpenForm() {
+    el('cardSaved').style.display = 'none';
+    el('cardEditWrap').style.display = 'none';
+    el('cardAddr').style.display = 'block';
+    el('cardSaveWrap').style.display = 'flex';
+  }
+  function saveCard() {
+    var addr = el('cardAddr').value.trim();
+    if (addr.length < 5) { cardMsgSet('Kindly enter a full delivery address.', true); return; }
+    el('cardSave').disabled = true;
+    cardMsgSet('Saving...', false);
+    fetch(SCRIPT_URL + '?card=1&token=' + encodeURIComponent(token) + '&address=' + encodeURIComponent(addr))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        el('cardSave').disabled = false;
+        if (d && d.ok) { cardMsgSet('', false); cardShowSaved(addr); }
+        else { cardMsgSet('Something interrupted the connection. Please try once more.', true); }
+      })
+      .catch(function () {
+        el('cardSave').disabled = false;
+        cardMsgSet('Something interrupted the connection. Please try once more.', true);
+      });
+  }
+
+  el('chaufToggle').addEventListener('click', chaufOpenForm);
+  el('chaufEdit').addEventListener('click', chaufOpenForm);
+  el('pickHome').addEventListener('click', function () { chaufPick('Home'); });
+  el('pickHotel').addEventListener('click', function () { chaufPick('Hotel'); });
+  el('chaufSave').addEventListener('click', saveChauf);
+  el('cardSave').addEventListener('click', saveCard);
+  el('cardEdit').addEventListener('click', cardOpenForm);
+  el('seatSave').addEventListener('click', saveSeats);
 
   var remembered = null;
   try { remembered = localStorage.getItem('gala_' + token); } catch (e) {}
