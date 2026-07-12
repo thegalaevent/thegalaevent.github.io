@@ -343,9 +343,15 @@
     <div class="reveal">
       <div class="rule"></div>
       <p class="note">This invitation is extended personally to you and admits one. The favour of your reply is respectfully requested.</p>
-      <div class="actions">
+      <div class="actions" id="rsvpActions">
         <button class="btn-accept" id="btnYes" type="button">Honoured to attend</button>
         <button class="btn-decline" id="btnNo" type="button">Regretfully decline</button>
+      </div>
+      <div id="phoneStep" style="display:none">
+        <p class="hub-note">So that our team may attend to you personally, kindly confirm your WhatsApp number.</p>
+        <input class="fld" id="rsvpPhone" placeholder="Phone number - with country code" inputmode="tel" autocomplete="tel">
+        <div class="hub-actions"><button class="hub-btn solid" id="confirmYes" type="button">Confirm Attendance</button></div>
+        <p class="tiny-msg" id="phoneMsg"></p>
       </div>
       <p class="error-body state" id="errorBox">Something interrupted the connection. Please try once more.</p>
     </div>
@@ -398,9 +404,15 @@
       <p class="tiny-msg" id="chaufMsg"></p>
       <div id="cardWrap" style="display:none">
         <p class="hub-label">Your Invitation Card</p>
-        <p class="hub-note">A physical invitation card will soon be delivered to your hand. Kindly share your delivery address within Jordan.</p>
-        <input class="fld" id="cardAddr" placeholder="Delivery address - area, street, building">
-        <div class="hub-actions" id="cardSaveWrap"><button class="hub-btn solid" id="cardSave" type="button">Confirm Address</button></div>
+        <p class="hub-note">A physical invitation card will soon be delivered to your hand. Kindly share your delivery details within Jordan.</p>
+        <div id="cardFields">
+          <input class="fld" id="cardCity" placeholder="City">
+          <input class="fld" id="cardArea" placeholder="Area">
+          <input class="fld" id="cardStreet" placeholder="Street">
+          <input class="fld" id="cardBldg" placeholder="Villa / Building number">
+          <input class="fld" id="cardPhone" placeholder="Phone number for delivery" inputmode="tel">
+        </div>
+        <div class="hub-actions" id="cardSaveWrap"><button class="hub-btn solid" id="cardSave" type="button">Confirm Delivery Details</button></div>
         <p class="hub-note" id="cardSaved" style="display:none"></p>
         <div class="hub-actions" id="cardEditWrap" style="display:none"><button class="hub-btn" id="cardEdit" type="button">Amend Address</button></div>
         <p class="tiny-msg" id="cardMsg"></p>
@@ -616,21 +628,39 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   function cardMsgSet(t, bad) { var m = el('cardMsg'); m.textContent = t; m.className = bad ? 'tiny-msg bad' : 'tiny-msg'; }
   function cardShowSaved(addr) {
-    el('cardAddr').style.display = 'none';
+    el('cardFields').style.display = 'none';
     el('cardSaveWrap').style.display = 'none';
-    el('cardSaved').textContent = 'Your invitation card will be delivered to: ' + addr;
+    el('cardSaved').textContent = 'Your invitation card will be delivered to: ' + addr.replace(/ \| /g, ' \u00B7 ');
     el('cardSaved').style.display = 'block';
     el('cardEditWrap').style.display = 'flex';
+    try {
+      var parts = {};
+      addr.split(' | ').forEach(function (p) {
+        var ix = p.indexOf(': ');
+        if (ix !== -1) parts[p.slice(0, ix)] = p.slice(ix + 2);
+      });
+      if (parts['City']) el('cardCity').value = parts['City'];
+      if (parts['Area']) el('cardArea').value = parts['Area'];
+      if (parts['Street']) el('cardStreet').value = parts['Street'];
+      if (parts['Villa/Bldg']) el('cardBldg').value = parts['Villa/Bldg'];
+      if (parts['Phone']) el('cardPhone').value = parts['Phone'];
+    } catch (e2) {}
   }
   function cardOpenForm() {
     el('cardSaved').style.display = 'none';
     el('cardEditWrap').style.display = 'none';
-    el('cardAddr').style.display = 'block';
+    el('cardFields').style.display = 'block';
     el('cardSaveWrap').style.display = 'flex';
   }
   function saveCard() {
-    var addr = el('cardAddr').value.trim();
-    if (addr.length < 5) { cardMsgSet('Kindly enter a full delivery address.', true); return; }
+    var city = el('cardCity').value.trim();
+    var area = el('cardArea').value.trim();
+    var street = el('cardStreet').value.trim();
+    var bldg = el('cardBldg').value.trim();
+    var dphone = el('cardPhone').value.trim();
+    if (!city || !area || !street || !bldg) { cardMsgSet('Kindly complete every field of the delivery details.', true); return; }
+    if (dphone.replace(/\D/g, '').length < 8) { cardMsgSet('Kindly enter a valid phone number for delivery.', true); return; }
+    var addr = 'City: ' + city + ' | Area: ' + area + ' | Street: ' + street + ' | Villa/Bldg: ' + bldg + ' | Phone: ' + dphone;
     el('cardSave').disabled = true;
     cardMsgSet('Saving...', false);
     fetch(SCRIPT_URL + '?card=1&token=' + encodeURIComponent(token) + '&address=' + encodeURIComponent(addr))
@@ -672,12 +702,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   document.getElementById('nameNo').textContent = firstName || 'dear guest';
 
   var busy = false;
-  function respond(answer) {
+  function respond(answer, phone) {
     if (busy) return;
     busy = true;
     var yes = document.getElementById('btnYes');
     var no = document.getElementById('btnNo');
-    yes.disabled = true; no.disabled = true;
+    var cf = document.getElementById('confirmYes');
+    yes.disabled = true; no.disabled = true; cf.disabled = true;
     document.getElementById('errorBox').classList.remove('visible');
 
     var done = function () {
@@ -687,7 +718,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     };
     var fail = function () {
       busy = false;
-      yes.disabled = false; no.disabled = false;
+      yes.disabled = false; no.disabled = false; cf.disabled = false;
       document.getElementById('errorBox').classList.add('visible');
     };
 
@@ -695,13 +726,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     var ctrl = new AbortController();
     var timer = setTimeout(function () { ctrl.abort(); }, 25000);
-    fetch(SCRIPT_URL + '?token=' + encodeURIComponent(token) + '&response=' + answer, { signal: ctrl.signal })
+    fetch(SCRIPT_URL + '?token=' + encodeURIComponent(token) + '&response=' + answer + (phone ? '&phone=' + encodeURIComponent(phone) : ''), { signal: ctrl.signal })
     .then(function (r) { return r.json(); })
     .then(function (data) { clearTimeout(timer); data && data.ok ? done() : fail(); })
     .catch(function () { clearTimeout(timer); fail(); });
   }
 
-  document.getElementById('btnYes').addEventListener('click', function () { respond('yes'); });
+  function phoneMsgSet(t, bad) { var m = el('phoneMsg'); m.textContent = t; m.className = bad ? 'tiny-msg bad' : 'tiny-msg'; }
+
+  document.getElementById('btnYes').addEventListener('click', function () {
+    if (busy) return;
+    document.getElementById('rsvpActions').style.display = 'none';
+    document.getElementById('phoneStep').style.display = 'block';
+    try { document.getElementById('rsvpPhone').focus(); } catch (e) {}
+  });
+  document.getElementById('confirmYes').addEventListener('click', function () {
+    var v = document.getElementById('rsvpPhone').value.trim();
+    if (v.replace(/\D/g, '').length < 8) { phoneMsgSet('Kindly enter a valid number, with country code.', true); return; }
+    phoneMsgSet('', false);
+    respond('yes', v);
+  });
   document.getElementById('btnNo').addEventListener('click', function () { respond('no'); });
 </script>
 </body>
