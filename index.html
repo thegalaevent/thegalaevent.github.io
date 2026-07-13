@@ -248,6 +248,7 @@
   .fld:focus { border-color: var(--gold); }
   .fld::placeholder { color: var(--cream-dim); }
   .tiny-msg { font-size: 0.72rem; letter-spacing: 0.08em; color: var(--cream-dim); margin-top: 10px; min-height: 1em; }
+  .gold-note { color: var(--gold); font-size: 0.8rem; letter-spacing: 0.06em; margin-top: 16px; }
   .tiny-msg.bad { color: #c98080; }
   .seat-row { max-width: 340px; margin: 8px auto 0; }
   .seat-fixed {
@@ -348,7 +349,8 @@
         <button class="btn-decline" id="btnNo" type="button">Regretfully decline</button>
       </div>
       <div id="phoneStep" style="display:none">
-        <p class="hub-note">So that our team may attend to you personally, kindly confirm your WhatsApp number.</p>
+        <p class="hub-note">So that our team may attend to you personally, kindly confirm your details.</p>
+        <input class="fld" id="rsvpCardName" placeholder="First and last name - as on your invitation card">
         <input class="fld" id="rsvpPhone" placeholder="Phone number - with country code" inputmode="tel" autocomplete="tel">
         <div class="hub-actions"><button class="hub-btn solid" id="confirmYes" type="button">Confirm Attendance</button></div>
         <p class="tiny-msg" id="phoneMsg"></p>
@@ -374,6 +376,7 @@
         <p class="ecard-code" id="ecardCode"></p>
         <p class="ecard-note">Present upon arrival &#183; Admits one</p>
       </div>
+      <p class="hub-note gold-note" id="belowNote">Kindly continue below &#8595; a few details for your arrival and your invitation card await you.</p>
       <p class="hub-label">Your Evening</p>
       <div class="hub-actions">
         <a class="hub-btn" href="https://maps.app.goo.gl/S1gajAVATakvTFJw9" target="_blank" rel="noopener">Location Map</a>
@@ -522,7 +525,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (d.invname) { el('cardInvName').value = d.invname; }
       else if (!el('cardInvName').value) { el('cardInvName').value = fullName; }
       if (d.ig) { el('cardIg').value = d.ig; }
-      if (d.card) { cardShowSaved(d.card, d.invname || ''); }
+      if (d.card) { cardShowSaved(d.card, d.invname || ''); el('belowNote').style.display = 'none'; }
     }
     if (d.ch && d.ch.on) { chaufShowSaved(d.ch.loc, d.ch.ph); }
     if (d.pax > 1 && d.seats && d.seats.length) { buildSeats(d); }
@@ -710,7 +713,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   document.getElementById('nameNo').textContent = fullName || 'dear guest';
 
   var busy = false;
-  function respond(answer, phone) {
+  function respond(answer, phone, invname) {
     if (busy) return;
     busy = true;
     var yes = document.getElementById('btnYes');
@@ -734,7 +737,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     var ctrl = new AbortController();
     var timer = setTimeout(function () { ctrl.abort(); }, 25000);
-    fetch(SCRIPT_URL + '?token=' + encodeURIComponent(token) + '&response=' + answer + (phone ? '&phone=' + encodeURIComponent(phone) : ''), { signal: ctrl.signal })
+    fetch(SCRIPT_URL + '?token=' + encodeURIComponent(token) + '&response=' + answer + (phone ? '&phone=' + encodeURIComponent(phone) : '') + (invname ? '&invname=' + encodeURIComponent(invname) : ''), { signal: ctrl.signal })
     .then(function (r) { return r.json(); })
     .then(function (data) { clearTimeout(timer); data && data.ok ? done() : fail(); })
     .catch(function () { clearTimeout(timer); fail(); });
@@ -746,13 +749,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (busy) return;
     document.getElementById('rsvpActions').style.display = 'none';
     document.getElementById('phoneStep').style.display = 'block';
-    try { document.getElementById('rsvpPhone').focus(); } catch (e) {}
+    var cn = document.getElementById('rsvpCardName');
+    if (!cn.value) { cn.value = fullName; }
+    try { cn.focus(); } catch (e) {}
   });
   document.getElementById('confirmYes').addEventListener('click', function () {
+    var nmv = document.getElementById('rsvpCardName').value.trim().replace(/\s+/g, ' ');
     var v = document.getElementById('rsvpPhone').value.trim();
+    if (nmv.length < 2 || nmv.indexOf(' ') === -1) { phoneMsgSet('Kindly enter your first and last name, as it shall appear on your invitation card.', true); return; }
     if (v.replace(/\D/g, '').length < 8) { phoneMsgSet('Kindly enter a valid number, with country code.', true); return; }
     phoneMsgSet('', false);
-    respond('yes', v);
+    respond('yes', v, nmv);
   });
   document.getElementById('btnNo').addEventListener('click', function () { respond('no'); });
 </script>
