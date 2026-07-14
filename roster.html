@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>The Gala &#183; RSVP Status</title>
+<style>
+  :root {
+    --ink: #0d1321; --navy: #212f52; --cream: #f6f6f9; --dim: #9aa2b8; --gold: #d1b589;
+    --green: #7fb08a; --amber: #d1b589; --rose: #c98080;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--ink); color: var(--cream);
+    font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
+    min-height: 100dvh; display: flex; flex-direction: column; align-items: center;
+    padding: 24px 16px 48px;
+  }
+  h1 { font-size: 0.8rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold); margin: 8px 0 4px; text-align: center; }
+  .sub { font-size: 0.7rem; color: var(--dim); letter-spacing: 0.12em; margin-bottom: 22px; text-align: center; }
+  .panel { width: 100%; max-width: 480px; }
+  label { display: block; text-align: left; font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim); margin: 14px 2px 6px; }
+  input {
+    width: 100%; padding: 15px; font-size: 1.05rem; text-align: center;
+    background: #141b2e; color: var(--cream);
+    border: 1px solid rgba(209,181,137,0.4); outline: none; letter-spacing: 0.12em;
+  }
+  input:focus { border-color: var(--gold); }
+  button {
+    width: 100%; padding: 15px; margin-top: 18px; font-size: 0.85rem;
+    letter-spacing: 0.2em; text-transform: uppercase; font-weight: 600;
+    background: var(--gold); color: #101728; border: none; cursor: pointer;
+  }
+  button:active { transform: translateY(1px); }
+  button.ghost { background: transparent; color: var(--dim); border: 1px solid rgba(154,162,184,0.3); margin-top: 10px; }
+  .hint { font-size: 0.7rem; color: var(--dim); margin-top: 16px; line-height: 1.7; text-align: center; }
+  .err { color: var(--rose); font-size: 0.78rem; margin-top: 14px; text-align: center; letter-spacing: 0.05em; min-height: 1em; }
+
+  #board { display: none; width: 100%; max-width: 560px; }
+  .counts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .tile { background: #141b2e; border: 1px solid rgba(209,181,137,0.25); padding: 14px 10px; text-align: center; }
+  .tile .value { font-size: 1.9rem; font-weight: 700; }
+  .tile .label { font-size: 0.56rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); margin-top: 4px; }
+  .tile.a .value { color: var(--green); }
+  .tile.w .value { color: var(--amber); }
+  .tile.d .value { color: var(--rose); }
+  .section { font-size: 0.66rem; letter-spacing: 0.22em; text-transform: uppercase; margin: 26px 0 8px; text-align: left; display: flex; justify-content: space-between; align-items: baseline; }
+  .section.a { color: var(--green); }
+  .section.w { color: var(--amber); }
+  .section.d { color: var(--rose); }
+  .section .n { color: var(--dim); font-size: 0.62rem; }
+  .row {
+    display: flex; align-items: center; gap: 10px;
+    background: #141b2e; border: 1px solid rgba(209,181,137,0.18);
+    padding: 11px 15px; margin-top: 5px; text-align: left;
+  }
+  .row .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .row.a .dot { background: var(--green); }
+  .row.w .dot { background: var(--amber); }
+  .row.d .dot { background: var(--rose); }
+  .row .name { font-size: 0.98rem; font-weight: 500; }
+  .bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .bar .who { font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+  .bar .out { font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); cursor: pointer; background: none; border: none; width: auto; padding: 0; margin: 0; }
+  #meta { font-size: 0.66rem; color: var(--dim); margin-top: 24px; text-align: center; letter-spacing: 0.08em; line-height: 1.7; }
+  #loading { display: none; text-align: center; color: var(--dim); font-size: 0.8rem; letter-spacing: 0.15em; margin-top: 30px; }
+</style>
+</head>
+<body>
+  <h1>The Gala &#183; RSVP Status</h1>
+  <p class="sub">DMS INTERNAL &#183; CONFIDENTIAL</p>
+
+  <!-- ===== Sign in ===== -->
+  <div class="panel" id="gate">
+    <label for="user">Username</label>
+    <input id="user" type="text" placeholder="Department" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label for="pass">Password</label>
+    <input id="pass" type="password" placeholder="Password" autocomplete="off">
+    <button onclick="signIn()">Sign In</button>
+    <div class="err" id="err"></div>
+    <p class="hint">Access is provided by the DMS power user.<br>This view shows guest names and RSVP status only.</p>
+  </div>
+
+  <div id="loading">Loading roster...</div>
+
+  <!-- ===== Board ===== -->
+  <div id="board">
+    <div class="bar">
+      <span class="who" id="who"></span>
+      <button class="out" onclick="signOut()">Sign out</button>
+    </div>
+
+    <div class="counts">
+      <div class="tile a"><div class="value" id="cA">0</div><div class="label">Confirmed</div></div>
+      <div class="tile w"><div class="value" id="cW">0</div><div class="label">Awaiting</div></div>
+      <div class="tile d"><div class="value" id="cD">0</div><div class="label">Declined</div></div>
+    </div>
+
+    <div id="secA" class="section a"><span>Confirmed &#8226; Attending</span><span class="n" id="nA"></span></div>
+    <div id="listA"></div>
+
+    <div id="secW" class="section w"><span>Awaiting RSVP</span><span class="n" id="nW"></span></div>
+    <div id="listW"></div>
+
+    <div id="secD" class="section d"><span>Declined &#8226; Apologized</span><span class="n" id="nD"></span></div>
+    <div id="listD"></div>
+
+    <div id="meta"></div>
+    <button class="ghost" onclick="load()">Refresh</button>
+  </div>
+
+<script>
+  // The standalone read-only feed (see apps-script/RosterFeed.gs). Fill after deploy.
+  var FEED_URL = 'https://script.google.com/macros/s/AKfycbyYpMUBt-3Asa41ah14M3hEDU_4ux3JKwdIDvZBodqpuyCPEhB_ep_nPWcVG0Fsd94EPw/exec';
+
+  // Username is the Talent department name, no space (case-insensitive).
+  var USERS = ['talentmanagement', 'talentdepartment', 'talent'];
+
+  function el(id) { return document.getElementById(id); }
+
+  function signIn() {
+    var u = el('user').value.trim().toLowerCase();
+    var p = el('pass').value;
+    el('err').textContent = '';
+    if (USERS.indexOf(u) === -1) { el('err').textContent = 'Incorrect username or password.'; return; }
+    if (!p) { el('err').textContent = 'Enter the password.'; return; }
+    try { sessionStorage.setItem('gala_roster_k', p); } catch (e) {}
+    load();
+  }
+
+  function signOut() {
+    try { sessionStorage.removeItem('gala_roster_k'); } catch (e) {}
+    el('board').style.display = 'none';
+    el('gate').style.display = 'block';
+    el('pass').value = '';
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function fill(listId, names, cls) {
+    var html = '';
+    for (var i = 0; i < names.length; i++) {
+      html += '<div class="row ' + cls + '"><span class="dot"></span><span class="name">' + esc(names[i]) + '</span></div>';
+    }
+    el(listId).innerHTML = html;
+  }
+
+  function load() {
+    var k = '';
+    try { k = sessionStorage.getItem('gala_roster_k') || ''; } catch (e) {}
+    if (!k) { signOut(); return; }
+
+    el('gate').style.display = 'none';
+    el('board').style.display = 'none';
+    el('loading').style.display = 'block';
+
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 25000);
+
+    fetch(FEED_URL + '?key=' + encodeURIComponent(k), { signal: ctrl.signal })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        clearTimeout(timer);
+        el('loading').style.display = 'none';
+        if (!d || !d.ok) {
+          el('gate').style.display = 'block';
+          el('err').textContent = 'Incorrect username or password.';
+          try { sessionStorage.removeItem('gala_roster_k'); } catch (e) {}
+          return;
+        }
+        var a = d.attending || [], w = d.awaiting || [], dc = d.declined || [];
+        el('cA').textContent = a.length;
+        el('cW').textContent = w.length;
+        el('cD').textContent = dc.length;
+        el('nA').textContent = a.length;
+        el('nW').textContent = w.length;
+        el('nD').textContent = dc.length;
+        fill('listA', a, 'a');
+        fill('listW', w, 'w');
+        fill('listD', dc, 'd');
+        el('secD').style.display = dc.length ? 'flex' : 'none';
+        el('who').textContent = 'Signed in';
+        var t = d.time ? new Date(d.time) : new Date();
+        el('meta').innerHTML = 'Total ' + (d.counts ? d.counts.total : (a.length + w.length + dc.length)) +
+          ' guests &#183; updated ' + esc(t.toLocaleString());
+        el('board').style.display = 'block';
+      })
+      .catch(function () {
+        clearTimeout(timer);
+        el('loading').style.display = 'none';
+        el('gate').style.display = 'block';
+        el('err').textContent = 'Could not load. Check the connection and try again.';
+      });
+  }
+
+  // Enter key submits from either field.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && el('gate').style.display !== 'none') signIn();
+  });
+
+  // Resume an active session on reload.
+  (function () {
+    var k = '';
+    try { k = sessionStorage.getItem('gala_roster_k') || ''; } catch (e) {}
+    if (k) load();
+  })();
+</script>
+</body>
+</html>
